@@ -21,211 +21,204 @@ Folia 将附近加载的块分组以形成一个“独立区域”。
 
 Folia也是自己的项目，这个不会并入Paper
 在可预见的未来。
+更详细但抽象的概述：[项目概述](https://docs.papermc.io/folia/reference/overview)。
+＃＃ 常问问题
 
-A more detailed but abstract overview: [Project overview](https://docs.papermc.io/folia/reference/overview).
+### 哪些服务器类型可以从 Folia 中受益？
+自然分散玩家的服务器类型，
+像 skyblock 或 SMP，将从 Folia 中受益最多。 服务器
+也应该有相当大的玩家数量。
 
-## FAQ
+### Folia 最适合在什么硬件上运行？
+理想情况下，至少有 16 个核心（不是线程）。
 
-### What server types can benefit from Folia?
-Server types that naturally spread players out, 
-like skyblock or SMP, will benefit the most from Folia. The server
-should have a sizeable player count, too.
+### 如何最好地配置 Folia？
+首先，建议世界是预先生成的，以便数量
+所需的块系统工作线程数大大减少。
 
-### What hardware will Folia run best on?
-Ideally, at least 16 _cores_ (not threads).
+以下是基于测试的_非常粗略的_估计
+在 Folia 在我们运行的测试服务器上发布之前完成
+有大约 330 名玩家的峰值。 所以，它不准确，需要进一步调整 -
+只是以此为起点。
 
-### How to best configure Folia?
-First, it is recommended that the world is pre-generated so that the number
-of chunk system worker threads required is reduced greatly.
+机器上可用的内核总数应该是
+考虑在内。 然后，分配线程：
+- netty IO：每 200-300 名玩家约 4 个
+- 块系统 io 线程：每 200-300 名玩家约 3 个
+- 如果预先生成块系统工作人员，每 200-300 名玩家约 2 个
+- 如果不是预先生成的，就没有对块系统工作者的最佳猜测，因为
+   在我们运行的测试服务器上，我们给了 16 个线程，但块生成仍然是
+   约 300 名玩家时速度较慢。
+- GC 设置：???? 但是，GC 设置确实会分配并发线程，因此您需要
+   知道到底有多少。 这通常是通过“-XX:ConcGCThreads=n”标志实现的。 不要
+   将此标志与“-XX:ParallelGCThreads=n”混淆，因为并行 GC 线程仅在以下情况下运行
+   该应用程序被 GC 暂停，因此不应考虑在内。
 
-The following is a _very rough_ estimation based off of the testing
-done before Folia was released on the test server we ran that
-had ~330 players peak. So, it is not exact and will require further tuning - 
-just take it as a starting point.
+在所有分配之后，系统上剩余的核心直到 80%
+分配（分配的总线程数 < 80% 可用的 CPU）可以是
+分配给 tickthreads（在全局配置下，threaded-regions.threads）。
 
-The total number of cores on the machine available should be 
-taken into account. Then, allocate threads for: 
-- netty IO :~4 per 200-300 players
-- chunk system io threads: ~3 per 200-300 players
-- chunk system workers if pre-generated, ~2 per 200-300 players
-- There is no best guess for chunk system workers if not pre-generated, as
-  on the test server we ran we gave 16 threads but chunk generation was still
-  slow at ~300 players.
-- GC Settings: ???? But, GC settings _do_ allocate concurrent threads, and you need
-  to know exactly how many. This is typically through the `-XX:ConcGCThreads=n` flag. Do not
-  confuse this flag with `-XX:ParallelGCThreads=n`, as parallel GC threads only run when
-  the application is paused by GC and as such should not be taken into account.
+您不应分配超过 80% 的内核的原因是
+事实上，插件甚至服务器可能会使用额外的线程
+您无法配置甚至无法预测。
 
-After all of that allocation, the remaining cores on the system until 80%
-allocation (total threads allocated < 80% of cpus available) can be
-allocated to tickthreads (under global config, threaded-regions.threads). 
+另外，以上都是根据玩家数量粗略猜测，但是
+很可能线程分配不理想，而你
+将需要根据您最终看到的线程的使用情况对其进行调整。## 插件兼容性
 
-The reason you should not allocate more than 80% of the cores is due to the
-fact that plugins or even the server may make use of additional threads 
-that you cannot configure or even predict.
+没有更多的主线程。 我期待_every_单个插件
+存在需要_some_水平的修改功能
+在福利亚。 此外，_any kind_的多线程引入了
+插件保存数据中可能存在的竞争条件——因此，有约束
+成为需要做出的改变。
 
-Additionally, the above is all a rough guess based on player count, but
-it is very likely that the thread allocation will not be ideal, and you 
-will need to tune it based on usage of the threads that you end up seeing.
+因此，将您对兼容性的期望设为 0。
 
-## Plugin compatibility
+## API 计划
 
-There is no more main thread. I expect _every_ single plugin
-that exists to require _some_ level of modification to function
-in Folia. Additionally, multithreading of _any kind_ introduces
-possible race conditions in plugin held data - so, there are bound
-to be changes that need to be made.
+目前，有很多 API 依赖于主线程。
+我希望与 Paper 兼容的插件基本上为零
+与 Folia 兼容。 但是，有计划添加 API
+将使 Folia 插件与 Paper 兼容。
 
-So, have your expectations for compatibility at 0.
+例如，Bukkit 调度程序。 Bukkit Scheduler 本质上
+依赖于单个主线程。 Folia 的 RegionScheduler 和 Folia 的
+EntityScheduler 允许将任务安排到任何“下一个滴答”
+区域“拥有”一个位置或一个实体。 这些可以实施
+在普通纸上，除了他们安排到主线程 - 在这两种情况下，
+任务的执行将发生在“拥有”
+位置或实体。 这个概念一般适用，因为当前的论文
+（单线程）可以被视为一个巨大的“区域”，它包含
+所有世界中的所有块。
 
-## API plans
+目前还没有决定是否直接将这个 API 添加到 Paper 本身
+或到 Paperlib。
 
-Currently, there is a lot of API that relies on the main thread. 
-I expect basically zero plugins that are compatible with Paper to 
-be compatible with Folia. However, there are plans to add API that 
-would allow Folia plugins to be compatible with Paper.
+### 新规则
 
-For example, the Bukkit Scheduler. The Bukkit Scheduler inherently
-relies on a single main thread. Folia's RegionScheduler and Folia's
-EntityScheduler allow scheduling of tasks to the "next tick" of whatever
-region "owns" either a location or an entity. These could be implemented
-on regular Paper, except they schedule to the main thread - in both cases,
-the execution of the task will occur on the thread that "owns" the
-location or entity. This concept applies in general, as the current Paper
-(single threaded) can be viewed as one giant "region" that encompasses
-all chunks in all worlds. 
+首先，Folia 破坏了许多插件。 帮助用户弄清楚哪个
+插件工作，只有被明确标记的插件
+将加载与 Folia 一起工作的作者。 放置
+"folia-supported: true" 到插件的 plugin.yml，插件作者
+可以将他们的插件标记为与区域化多线程兼容。
 
-It is not yet decided whether to add this API to Paper itself directly
-or to Paperlib.
+另一个重要的规则是区域在 _parallel_ 中勾选，而不是
+_同时_。 他们不共享数据，他们不期望共享数据，
+和共享数据_will_导致数据损坏。
+任何情况下运行在一个区域的代码都不能
+正在访问或修改位于另一个区域的数据。 只是
+因为多线程在名称中，并不意味着一切
+现在是线程安全的。 事实上，只有几件事情是
+使线程安全以实现这一点。 随着时间的推移，数
+线程上下文检查的数量只会增长，即使_if_它出现在
+性能损失 - _nobody_ 会使用或开发
+服务器平台漏洞百出，唯一的办法
+防止和发现这些错误是使错误的访问在
+不良访问的来源。
 
-### The new rules
+这意味着 Folia 兼容插件需要利用
+像 RegionScheduler 和 EntityScheduler 这样的 API 来确保
+他们的代码在正确的线程上下文中运行。
 
-First, Folia breaks many plugins. To aid users in figuring out which
-plugins work, only plugins that have been explicitly marked by the
-author(s) to work with Folia will be loaded. By placing
-"folia-supported: true" into the plugin's plugin.yml, plugin authors
-can mark their plugin as compatible with regionised multithreading.
+通常，假设一个区域拥有块数据是安全的
+从事件源（即玩家）开始大约 8 个块
+breaks 块，大概可以访问该块周围的 8 个块）。 但，
+这不能保证 - 插件应该利用即将到来的
+线程检查 API 以确保正确的行为。
 
-The other important rule is that the regions tick in _parallel_, and not 
-_concurrently_. They do not share data, they do not expect to share data,
-and sharing of data _will_ cause data corruption. 
-Code that is running in one region under no circumstance can 
-be accessing or modifying data that is in another region. Just 
-because multithreading is in the name, it doesn't mean that everything 
-is now thread-safe. In fact, there are only a _few_ things that were 
-made thread-safe to make this happen. As time goes on, the number 
-of thread context checks will only grow, even _if_ it comes at a 
-performance penalty - _nobody_ is going to use or develop for a 
-server platform that is buggy as hell, and the only way to 
-prevent and find these bugs is to make bad accesses fail _hard_ at the 
-source of the bad access.
+线程安全的唯一保证来自于一个事实
+单个区域拥有某些块中的数据 - 如果该区域是
+滴答作响，那么它就可以完全访问该数据。 这个数据是
+特别是实体/块/poi 数据，并且完全不相关
+到**任何**插件数据。
 
-This means that Folia compatible plugins need to take advantage of 
-API like the RegionScheduler and the EntityScheduler to ensure 
-their code is running on the correct thread context.
+正常的多线程规则适用于插件存储/访问的数据
+他们自己的数据或另一个插件的 - 事件/命令/等。 叫做
+在_parallel_因为区域在_parallel_滴答作响（我们不能
+以同步方式调用它们，因为这会引发死锁问题
+并且会妨碍性能）。 没有简单的方法可以解决这个问题，
+它完全取决于正在访问的数据。 有时一个
+并发集合（如 ConcurrentHashMap）就足够了，而且通常是
+不小心使用并发集合只会_隐藏_线程
+问题，然后几乎无法调试。
+### 当前 API 添加
 
-In general, it is safe to assume that a region owns chunk data
-in an approximate 8 chunks from the source of an event (i.e. player
-breaks block, can probably access 8 chunks around that block). But,
-this is not guaranteed - plugins should take advantage of upcoming
-thread-check API to ensure correct behavior.
+要正确理解 API 添加，请阅读
+[PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md)。
 
-The only guarantee of thread-safety comes from the fact that a
-single region owns data in certain chunks - and if that region is
-ticking, then it has full access to that data. This data is 
-specifically entity/chunk/poi data, and is entirely unrelated
-to **ANY** plugin data.
+- RegionScheduler、AsyncScheduler、GlobalRegionScheduler 和 EntityScheduler
+   作为 BukkitScheduler 的替代品。
+   实体调度程序通过 Entity#getScheduler 检索，并且
+   其余的调度器可以从 Bukkit/Server 类中获取。
+- Bukkit#isOwnedByCurrentRegion 测试当前滴答区域
+   拥有职位/实体
 
-Normal multithreading rules apply to data that plugins store/access
-their own data or another plugin's - events/commands/etc. are called 
-in _parallel_ because regions are ticking in _parallel_ (we CANNOT 
-call them in a synchronous fashion, as this opens up deadlock issues 
-and would handicap performance). There are no easy ways out of this, 
-it depends solely on what data is being accessed. Sometimes a 
-concurrent collection (like ConcurrentHashMap) is enough, and often a 
-concurrent collection used carelessly will only _hide_ threading 
-issues, which then become near impossible to debug.
+### API 的线程上下文
 
-### Current API additions
+要正确理解 API 添加，请阅读
+[PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md)。
 
-To properly understand API additions, please read
-[PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md).
+一般经验法则：
 
-- RegionScheduler, AsyncScheduler, GlobalRegionScheduler, and EntityScheduler 
-  acting as a replacement for  the BukkitScheduler.
-  The entity scheduler is retrieved via Entity#getScheduler, and the
-  rest of the schedulers can be retrieved from the Bukkit/Server classes.
-- Bukkit#isOwnedByCurrentRegion to test if the current ticking region
-  owns positions/entities
+1.实体/玩家的命令在拥有的区域上调用
+实体/玩家。 控制台命令在全局区域上执行。
 
-### Thread contexts for API
+2. 涉及单个实体的事件（即玩家休息/位置块）是
+调用区域拥有实体。 涉及实体操作的事件
+（例如实体损坏）在拥有目标实体的区域上调用。
 
-To properly understand API additions, please read
-[PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md).
+3.事件的异步修饰符已弃用-所有事件
+从区域或全球区域发射被认为是同步的，
+即使不再有主线程。
 
-General rules of thumb:
+### 当前损坏的 API
 
-1. Commands for entities/players are called on the region which owns
-the entity/player. Console commands are executed on the global region.
+- 大多数与门户/重生玩家/一些交互的 API
+   播放器登录 API 已损坏。
+- 所有记分板 API 都被认为是坏的（这是全局状态
+   我还没有想出如何正确实施）
+- 世界加载/卸载
+- 实体#teleport。 这将永远不会在任何情况下回来，
+   使用 teleportAsync
+- 可能更多
 
-2. Events involving a single entity (i.e player breaks/places block) are
-called on the region owning entity. Events involving actions on an entity
-(such as entity damage) are invoked on the region owning the target entity.
+### 计划的 API 添加- 适当的异步事件。 这将允许事件的结果
+   稍后在不同的线程上下文中完成。 这是必需的
+   以异步方式实现诸如生成位置选择之类的东西
+   在区域外访问块数据时需要块加载。
+- 世界加载/卸载
+- 更多来这里
 
-3. The async modifier for events is deprecated - all events
-fired from regions or the global region are considered _synchronous_, 
-even though there is no main thread anymore. 
+### 计划的 API 更改
 
-### Current broken API
+- 全面的超强线程检查。 这绝对是
+   需要防止插件开发者发送可能随机的代码
+   以完全_undiagnosable_方式破坏服务器的随机部分。
+- 更多来这里
 
-- Most API that interacts with portals / respawning players / some
-  player login API is broken.
-- ALL scoreboard API is considered broken (this is global state that
-  I've not figured out how to properly implement yet)
-- World loading/unloading
-- Entity#teleport. This will NEVER UNDER ANY CIRCUMSTANCE come back, 
-  use teleportAsync
-- Could be more
-
-### Planned API additions
-
-- Proper asynchronous events. This would allow the result of an event
-  to be completed later, on a different thread context. This is required
-  to implement some things like spawn position select, as asynchronous
-  chunk loads are required when accessing chunk data out-of-region.
-- World loading/unloading
-- More to come here
-
-### Planned API changes
-
-- Super aggressive thread checks across the board. This is absolutely
-  required to prevent plugin devs from shipping code that may randomly
-  break random parts of the server in entirely _undiagnosable_ manners.
-- More to come here
-
-### Maven information
-* Maven Repo (for folia-api):
+### Maven信息
+* Maven 回购（用于 folia-api）：
 ```xml
-<repository>
-    <id>papermc</id>
-    <url>https://repo.papermc.io/repository/maven-public/</url>
-</repository>
+<存储库>
+     <id>纸片机</id>
+     <url>https://repo.papermc.io/repository/maven-public/</url>
+</存储库>
 ```
-* Artifact Information:
+* 神器信息：
 ```xml
-<dependency>
-    <groupId>dev.folia</groupId>
-    <artifactId>folia-api</artifactId>
-    <version>1.19.4-R0.1-SNAPSHOT</version>
-    <scope>provided</scope>
-</dependency>
- ```
+<依赖关系>
+     <groupId>dev.folia</groupId>
+     <artifactId>folia-api</artifactId>
+     <版本>1.19.4-R0.1-快照</版本>
+     <范围>提供</范围>
+</依赖>
+  ```
 
 
-## License
-The PATCHES-LICENSE file describes the license for api & server patches,
-found in `./patches` and its subdirectories except when noted otherwise.
+＃＃ 执照
+PATCHES-LICENSE 文件描述了 api 和服务器补丁的许可证，
+在 `./patches` 及其子目录中找到，除非另有说明。
 
-The fork is based off of PaperMC's fork example found [here](https://github.com/PaperMC/paperweight-examples).
-As such, it contains modifications to it in this project, please see the repository for license information
-of modified files.
+该分叉基于 [此处](https://github.com/PaperMC/paperweight-examples) 中的 PaperMC 分叉示例。
+因此，它包含在此项目中对其进行的修改，请参阅存储库以获取许可信息
+的修改文件。
