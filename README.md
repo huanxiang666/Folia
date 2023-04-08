@@ -1,26 +1,26 @@
 <div align=center>
     <img src="./folia.png">
     <br /><br />
-    <p>Fork of <a href="https://github.com/PaperMC/Paper">Paper</a> which adds regionised multithreading to the dedicated server.</p>
+    <p>分支来自 <a href="https://github.com/PaperMC/Paper">Paper</a> 将区域化多线程添加到专用服务器.</p>
 </div>
 
-## Overview
+## 概述
 
-Folia groups nearby loaded chunks to form an "independent region."
-See [REGION_LOGIC.md](REGION_LOGIC.md) for exact details on how Folia
-will group nearby chunks.
-Each independent region has its own tick loop, which is ticked at the
-regular Minecraft tickrate (20TPS). The tick loops are executed
-on a thread pool in parallel. There is no main thread anymore, 
-as each region effectively has its own "main thread" that executes
-the entire tick loop.
+Folia 将附近加载的块分组以形成一个“独立区域”。
+请参阅 [REGION_LOGIC.md](REGION_LOGIC.md) 以了解有关 Folia 如何运行的确切详细信息
+将附近的块分组。
+每个独立的区域都有自己的滴答循环，在
+常规 Minecraft 滴答速率 (20TPS)。 滴答循环被执行
+在并行线程池上。 没有主线程了，
+因为每个区域实际上都有自己的“主线程”来执行
+整个滴答循环。
 
-For a server with many spread out players, Folia will create many
-spread out regions and tick them all in parallel on a configurable sized
-threadpool. Thus, Folia should scale well for servers like this.
+对于一个有很多分散玩家的服务器，Folia 会创建很多
+展开区域并在可配置的大小上并行勾选它们
+线程池。 因此，Folia 应该可以很好地适应这样的服务器。
 
-Folia is also its own project, this will not be merged into Paper
-for the foreseeable future. 
+Folia也是自己的项目，这个不会并入Paper
+在可预见的未来。
 
 A more detailed but abstract overview: [Project overview](https://docs.papermc.io/folia/reference/overview).
 
